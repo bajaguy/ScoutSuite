@@ -2,8 +2,8 @@ from unittest import TestCase
 
 from mock import MagicMock, patch
 
-from ScoutSuite.__main__ import main
-from ScoutSuite.cli_parser import ScoutSuiteArgumentParser
+from ScoutSuite.__main__ import run_from_cli
+from ScoutSuite.core.cli_parser import ScoutSuiteArgumentParser
 
 
 class TestMainClass(TestCase):
@@ -19,11 +19,11 @@ class TestMainClass(TestCase):
 
         self.mocked_printInfo = MagicMock()
 
-        for import_name, mocked_object in [("printInfo", self.mocked_printInfo),
+        for import_name, mocked_object in [("print_info", self.mocked_printInfo),
                                            ("get_provider", self.mocked_provider),
                                            ("Ruleset", self.mocked_ruleset),
                                            ("ProcessingEngine", self.mocked_engine),
-                                           ("Scout2Report", self.mocked_report),
+                                           ("ScoutReport", self.mocked_report),
                                            ("webbrowser", self.mocked_browser)]:
             constructor_obj = patch("ScoutSuite.__main__.%s" % import_name, return_value=mocked_object).start()
             self.constructor[mocked_object] = constructor_obj
@@ -33,38 +33,38 @@ class TestMainClass(TestCase):
     def tearDown(self):
         patch.stopall()
 
-    def test_empty(self):
+    async def test_empty(self):
         args = None
         code = None
 
         with patch("sys.stderr", return_value=MagicMock()):
             with self.assertRaises(SystemExit):
                 args = ScoutSuiteArgumentParser().parse_args(args)
-                code = main(args)
+                code = await run_from_cli(args)
 
         assert (code is None)
 
-    def test_aws_provider(self):
+    async def test_aws_provider(self):
         args = ['aws']
         self.mocked_provider.provider_code = "aws"
 
         args = ScoutSuiteArgumentParser().parse_args(args)
-        code = main(args)
+        code = await run_from_cli(args)
 
         success_code = 0
         assert (code == success_code)
 
         report_init_args = self.constructor[self.mocked_report].call_args_list[0][0]
         assert (report_init_args[0] == "aws")  # provider
-        assert (report_init_args[1] == "aws-default")  # report_file_name
+        assert (report_init_args[1] == "aws")  # report_file_name
         assert (report_init_args[2] == "scoutsuite-report")  # report_dir
 
-    def test_gcp_provider(self):
+    async def test_gcp_provider(self):
         args = ["gcp", "--service-account", "fakecredentials"]
         self.mocked_provider.provider_code = "gcp"
 
         args = ScoutSuiteArgumentParser().parse_args(args)
-        code = main(args)
+        code = await run_from_cli(args)
 
         success_code = 0
         assert (code == success_code)
@@ -74,12 +74,12 @@ class TestMainClass(TestCase):
         assert (report_init_args[1] == "gcp")  # report_file_name
         assert (report_init_args[2] == "scoutsuite-report")  # report_dir
 
-    def test_azure_provider(self):
+    async def test_azure_provider(self):
         args = ["azure", "--cli"]
         self.mocked_provider.provider_code = "azure"
 
         args = ScoutSuiteArgumentParser().parse_args(args)
-        code = main(args)
+        code = await run_from_cli(args)
 
         success_code = 0
         assert (code == success_code)
@@ -89,18 +89,18 @@ class TestMainClass(TestCase):
         assert (report_init_args[1] == "azure")  # report_file_name
         assert (report_init_args[2] == "scoutsuite-report")  # report_dir
 
-    def test_unauthenticated(self):
+    async def test_unauthenticated(self):
         args = ["aws"]
         self.mocked_provider.provider_code = "aws"
         self.mocked_provider.authenticate = MagicMock(return_value=False)
 
         args = ScoutSuiteArgumentParser().parse_args(args)
-        code = main(args)
+        code = await run_from_cli(args)
 
         unauthenticated_code = 42
         assert (code == unauthenticated_code)
 
-    def test_keyboardinterrupted(self):
+    async def test_keyboardinterrupted(self):
         args = ["aws"]
         self.mocked_provider.provider_code = "aws"
 
@@ -110,7 +110,7 @@ class TestMainClass(TestCase):
         self.mocked_provider.fetch = MagicMock(side_effect=_raise(KeyboardInterrupt))
 
         args = ScoutSuiteArgumentParser().parse_args(args)
-        code = main(args)
+        code = await run_from_cli(args)
 
         keyboardinterrupted_code = 130
         assert (code == keyboardinterrupted_code)
